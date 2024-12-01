@@ -1,4 +1,4 @@
-use nalgebra::{DMatrix, DVector};
+use nalgebra::{Const, Dynamic, DMatrix, DVector, Matrix, VecStorage};
 type Row = Matrix<f64, Const<1>, Dynamic, VecStorage<f64, Const<1>, Dynamic>>;
 type Column = Matrix<f64, Dynamic, Const<1>, VecStorage<f64, Dynamic, Const<1>>>;
 
@@ -15,7 +15,6 @@ fn main() {
     primal_simplex(a, b, c, 100);
 }
 
-use nalgebra::{Const, Dynamic, Matrix, VecStorage};
 
 fn get_reduced_costs(
     cb: &Row,
