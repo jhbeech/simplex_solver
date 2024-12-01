@@ -1,4 +1,6 @@
 use nalgebra::{DMatrix, DVector};
+type Row = Matrix<f64, Const<1>, Dynamic, VecStorage<f64, Const<1>, Dynamic>>;
+type Column = Matrix<f64, Dynamic, Const<1>, VecStorage<f64, Dynamic, Const<1>>>;
 
 fn main() {
     let a = DMatrix::<f64>::from_row_slice(
@@ -16,17 +18,15 @@ fn main() {
 use nalgebra::{Const, Dynamic, Matrix, VecStorage};
 
 fn get_reduced_costs(
-    cb: &Matrix<f64, Const<1>, Dynamic, VecStorage<f64, Const<1>, Dynamic>>,
-    cn: &Matrix<f64, Const<1>, Dynamic, VecStorage<f64, Const<1>, Dynamic>>,
-    basis_inv: &Matrix<f64, Dynamic, Dynamic, VecStorage<f64, Dynamic, Dynamic>>,
-    non_basis_matrix: &Matrix<f64, Dynamic, Dynamic, VecStorage<f64, Dynamic, Dynamic>>,
-) -> Matrix<f64, Const<1>, Dynamic, VecStorage<f64, Const<1>, Dynamic>> {
+    cb: &Row,
+    cn: &Row,
+    basis_inv: &DMatrix<f64>,
+    non_basis_matrix: &DMatrix<f64>,
+) -> Row {
     cb * basis_inv * non_basis_matrix - cn
 }
 
-fn get_entering_var(
-    reduced_costs: &Matrix<f64, Const<1>, Dynamic, VecStorage<f64, Const<1>, Dynamic>>,
-) -> Option<usize> {
+fn get_entering_var(reduced_costs: &Row) -> Option<usize> {
     reduced_costs
         .iter()
         .enumerate()
@@ -36,9 +36,9 @@ fn get_entering_var(
 }
 
 fn get_leaving_var(
-    non_basis_matrix: &Matrix<f64, Dynamic, Dynamic, VecStorage<f64, Dynamic, Dynamic>>,
-    basis_inv: &Matrix<f64, Dynamic, Dynamic, VecStorage<f64, Dynamic, Dynamic>>,
-    b: &Matrix<f64, Dynamic, Const<1>, VecStorage<f64, Dynamic, Const<1>>>,
+    non_basis_matrix: &DMatrix<f64>,
+    basis_inv: &DMatrix<f64>,
+    b: &Column,
     entering_loc: usize,
 ) -> Option<usize> {
     let tableau_row = basis_inv * &non_basis_matrix.column(entering_loc);
@@ -52,7 +52,7 @@ fn get_leaving_var(
         .map(|(idx, _)| idx) // Extract the index of the minimum
 }
 
-fn primal_simplex(a: DMatrix<f64>, b: DVector<f64>, c: DVector<f64>) {
+fn primal_simplex(a: DMatrix<f64>, b: Column, c: Column) {
     let rows = a.nrows(); // Number of constraints
     let cols = a.ncols(); // Number of variables
     let mut basis_indices: Vec<usize> = (cols - rows..cols).collect();
