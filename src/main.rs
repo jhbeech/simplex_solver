@@ -1,10 +1,17 @@
 use nalgebra::{DMatrix, DVector};
 
 fn main() {
-    let a = DMatrix::<f64>::from_row_slice(2, 4, &[1.0, 2.0, 3.0, 10.0, 4.0, 5.0, 6.0, 11.0]);
-    let b = DVector::<f64>::from_vec(vec![1.0, 1.0]);
-    let c = DVector::<f64>::from_vec(vec![1.0, 1.0, 1.0, 1.0]);
-
+    // let a = DMatrix::<f64>::from_row_slice(2, 4, &[1.0, 2.0, 3.0, 10.0, 4.0, 5.0, 6.0, 11.0]);
+    // let b = DVector::<f64>::from_vec(vec![1.0, 1.0]);
+    let a = DMatrix::<f64>::from_row_slice(
+        3,
+        7,
+        &[
+            5., 2., 5., 10., 1., 0., 0., 10., 0., 3., 1., 0., 1., 0., 1., 1., 1., 2., 0., 0., 1.,
+        ],
+    );
+    let b = DVector::<f64>::from_vec(vec![10., 12., 25.]);
+    let c = DVector::<f64>::from_vec(vec![1.0, 1.0, 1.0, 1.0, 0., 0., 0.]);
     primal_simplex(a, b, c);
 }
 
@@ -31,13 +38,13 @@ fn get_entering_var(
 }
 
 fn get_leaving_var(
-    non_basis_matrix: Matrix<f64, Dynamic, Dynamic, VecStorage<f64, Dynamic, Dynamic>>,
-    basis_inv: Matrix<f64, Dynamic, Dynamic, VecStorage<f64, Dynamic, Dynamic>>,
-    b: Matrix<f64, Dynamic, Const<1>, VecStorage<f64, Dynamic, Const<1>>>,
+    non_basis_matrix: &Matrix<f64, Dynamic, Dynamic, VecStorage<f64, Dynamic, Dynamic>>,
+    basis_inv: &Matrix<f64, Dynamic, Dynamic, VecStorage<f64, Dynamic, Dynamic>>,
+    b: &Matrix<f64, Dynamic, Const<1>, VecStorage<f64, Dynamic, Const<1>>>,
     entering_loc: usize,
 ) -> Option<usize> {
     let a_entering = &non_basis_matrix.column(entering_loc);
-    let tableau = &basis_inv * a_entering;
+    let tableau = basis_inv * a_entering;
     let basis_inv_b = basis_inv * b;
     let ratio = basis_inv_b.component_div(&tableau);
     let leaving_var_loc = ratio
@@ -52,34 +59,42 @@ fn get_leaving_var(
 fn primal_simplex(a: DMatrix<f64>, b: DVector<f64>, c: DVector<f64>) {
     let rows = a.nrows(); // Number of constraints
     let cols = a.ncols(); // Number of variables
-    let basis_indices: Vec<usize> = (cols - rows..cols).collect();
-    let non_basis_indices: Vec<usize> = (0..cols).filter(|i| !basis_indices.contains(&i)).collect();
-    let basis_matrix = a.select_columns(&basis_indices);
-    let non_basis_matrix = a.select_columns(&non_basis_indices);
-    let cb = c.transpose().select_columns(&basis_indices);
-    let cn = c.transpose().select_columns(&non_basis_indices);
-    let reduced_costs = get_reduced_costs(&cb, &cn, &basis_inv, &non_basis_matrix);
-    let basis_inv_or_none = basis_matrix.try_inverse();
-    let Some(basis_inv) = basis_inv_or_none else {
-        // singular
-        return;
-    };
+    let mut basis_indices: Vec<usize> = (cols - rows..cols).collect();
 
-    let entering_var_loc_or_none = get_entering_var(&reduced_costs);
-    let Some(entering_var_loc) = entering_var_loc_or_none else {
-        // Terminated
-        return;
-    };
-    let entering_var = non_basis_indices[entering_var_loc];
-    
-    let leaving_var_loc_or_none = get_leaving_var(non_basis_matrix, basis_inv, b, entering_var_loc);
-    let Some(leaving_var_loc) = leaving_var_loc_or_none else {
-        // Unbounded
-        return;
-    };
-    let leaving_var = basis_indices[leaving_var_loc];
+    for _ in 0..100 {
+        let non_basis_indices: Vec<usize> =
+            (0..cols).filter(|i| !basis_indices.contains(&i)).collect();
+        let non_basis_matrix = a.select_columns(&non_basis_indices);
+        let basis_matrix = a.select_columns(&basis_indices);
+        let cb = c.transpose().select_columns(&basis_indices);
+        let cn = c.transpose().select_columns(&non_basis_indices);
+        let basis_inv_or_none = basis_matrix.try_inverse();
+        let Some(basis_inv) = basis_inv_or_none else {
+            // singular
+            break;
+        };
+        let reduced_costs = get_reduced_costs(&cb, &cn, &basis_inv, &non_basis_matrix);
 
-    println!("{:?}", entering_var);
-    println!("{:?}", leaving_var);
+        let entering_var_loc_or_none = get_entering_var(&reduced_costs);
+        let Some(entering_var_loc) = entering_var_loc_or_none else {
+            // Terminated
+            break;
+        };
+        let entering_var = non_basis_indices[entering_var_loc];
 
+        let leaving_var_loc_or_none =
+            get_leaving_var(&non_basis_matrix, &basis_inv, &b, entering_var_loc);
+        let Some(leaving_var_loc) = leaving_var_loc_or_none else {
+            // Unbounded
+            break;
+        };
+        let _leaving_var = basis_indices[leaving_var_loc];
+
+        // need to replace leaving var with entering var (ie they are in same loc)
+        // for sherman morrison algorithm to work
+        basis_indices[leaving_var_loc] = entering_var;
+        // non_basis_indices[entering_var_loc] = leaving_var;
+    }
+
+    println!("{:?}", basis_indices);
 }
