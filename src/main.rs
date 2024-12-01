@@ -11,7 +11,7 @@ fn main() {
         ],
     );
     let b = DVector::<f64>::from_vec(vec![10., 12., 25.]);
-    let c = DVector::<f64>::from_vec(vec![1.0, 1.0, 1.0, 1.0, 0., 0., 0.]);
+    let c = DVector::<f64>::from_vec(vec![1.0, 1.0, 1.0, 1.0, 0., 0., 0.]).transpose();
     primal_simplex(a, b, c);
 }
 
@@ -52,7 +52,7 @@ fn get_leaving_var(
         .map(|(idx, _)| idx) // Extract the index of the minimum
 }
 
-fn primal_simplex(a: DMatrix<f64>, b: Column, c: Column) {
+fn primal_simplex(a: DMatrix<f64>, b: Column, c: Row) {
     let rows = a.nrows(); // Number of constraints
     let cols = a.ncols(); // Number of variables
     let mut basis_indices: Vec<usize> = (cols - rows..cols).collect();
@@ -62,8 +62,8 @@ fn primal_simplex(a: DMatrix<f64>, b: Column, c: Column) {
             (0..cols).filter(|i| !basis_indices.contains(&i)).collect();
         let non_basis_matrix = a.select_columns(&non_basis_indices);
         let basis_matrix = a.select_columns(&basis_indices);
-        let cb = c.transpose().select_columns(&basis_indices);
-        let cn = c.transpose().select_columns(&non_basis_indices);
+        let cb = c.select_columns(&basis_indices);
+        let cn = c.select_columns(&non_basis_indices);
         // TODO: add sherman morrison here
         let basis_inv_or_none = basis_matrix.try_inverse();
         let Some(basis_inv) = basis_inv_or_none else {
