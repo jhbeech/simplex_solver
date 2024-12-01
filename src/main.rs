@@ -40,12 +40,12 @@ fn get_leaving_var(
     b: &Column,
     entering_loc: usize,
 ) -> Option<usize> {
-    let tableau_row = basis_inv * &non_basis_matrix.column(entering_loc);
+    let tableau_entering_var_col = basis_inv * &non_basis_matrix.column(entering_loc);
     (basis_inv * b)
-        .component_div(&tableau_row)
+        .component_div(&tableau_entering_var_col)
         .iter()
         .enumerate()
-        .filter(|(idx, _)| tableau_row[*idx] > 0.00001)
+        .filter(|(idx, _)| tableau_entering_var_col[*idx] > 0.00001)
         .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap()) //Unwrap safe as 0 denominator filtered out
         .map(|(idx, _)| idx) // Extract the index of the minimum
 }
