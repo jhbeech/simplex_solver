@@ -1,8 +1,6 @@
 use nalgebra::{DMatrix, DVector};
 
 fn main() {
-    // let a = DMatrix::<f64>::from_row_slice(2, 4, &[1.0, 2.0, 3.0, 10.0, 4.0, 5.0, 6.0, 11.0]);
-    // let b = DVector::<f64>::from_vec(vec![1.0, 1.0]);
     let a = DMatrix::<f64>::from_row_slice(
         3,
         7,
@@ -43,17 +41,15 @@ fn get_leaving_var(
     b: &Matrix<f64, Dynamic, Const<1>, VecStorage<f64, Dynamic, Const<1>>>,
     entering_loc: usize,
 ) -> Option<usize> {
-    let a_entering = &non_basis_matrix.column(entering_loc);
-    let tableau = basis_inv * a_entering;
+    let tableau_row = basis_inv * &non_basis_matrix.column(entering_loc);
     let basis_inv_b = basis_inv * b;
-    let ratio = basis_inv_b.component_div(&tableau);
-    let leaving_var_loc = ratio
+    basis_inv_b
+        .component_div(&tableau_row)
         .iter()
         .enumerate()
-        .filter(|(idx, _)| tableau[*idx] > 0.00001) // Dereference idx to get the value
+        .filter(|(idx, _)| tableau_row[*idx] > 0.00001) // Dereference idx to get the value
         .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap()) // Unwrap safely if no NaN values
-        .map(|(idx, _)| idx); // Extract the index of the minimum
-    leaving_var_loc
+        .map(|(idx, _)| idx) // Extract the index of the minimum
 }
 
 fn primal_simplex(a: DMatrix<f64>, b: DVector<f64>, c: DVector<f64>) {
@@ -68,16 +64,17 @@ fn primal_simplex(a: DMatrix<f64>, b: DVector<f64>, c: DVector<f64>) {
         let basis_matrix = a.select_columns(&basis_indices);
         let cb = c.transpose().select_columns(&basis_indices);
         let cn = c.transpose().select_columns(&non_basis_indices);
+        // TODO: add sherman morrison here
         let basis_inv_or_none = basis_matrix.try_inverse();
         let Some(basis_inv) = basis_inv_or_none else {
-            // singular
+            print!("a is singular");
             break;
         };
         let reduced_costs = get_reduced_costs(&cb, &cn, &basis_inv, &non_basis_matrix);
 
         let entering_var_loc_or_none = get_entering_var(&reduced_costs);
         let Some(entering_var_loc) = entering_var_loc_or_none else {
-            // Terminated
+            // Terminated program
             break;
         };
         let entering_var = non_basis_indices[entering_var_loc];
@@ -85,7 +82,7 @@ fn primal_simplex(a: DMatrix<f64>, b: DVector<f64>, c: DVector<f64>) {
         let leaving_var_loc_or_none =
             get_leaving_var(&non_basis_matrix, &basis_inv, &b, entering_var_loc);
         let Some(leaving_var_loc) = leaving_var_loc_or_none else {
-            // Unbounded
+            println!("Program is unbounded");
             break;
         };
         let _leaving_var = basis_indices[leaving_var_loc];
