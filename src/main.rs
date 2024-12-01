@@ -55,35 +55,31 @@ fn primal_simplex(a: DMatrix<f64>, b: DVector<f64>, c: DVector<f64>) {
     let basis_indices: Vec<usize> = (cols - rows..cols).collect();
     let non_basis_indices: Vec<usize> = (0..cols).filter(|i| !basis_indices.contains(&i)).collect();
     let basis_matrix = a.select_columns(&basis_indices);
+    let non_basis_matrix = a.select_columns(&non_basis_indices);
+    let cb = c.transpose().select_columns(&basis_indices);
+    let cn = c.transpose().select_columns(&non_basis_indices);
+    let reduced_costs = get_reduced_costs(&cb, &cn, &basis_inv, &non_basis_matrix);
     let basis_inv_or_none = basis_matrix.try_inverse();
-    match basis_inv_or_none {
-        Some(basis_inv) => {
-            let non_basis_matrix = a.select_columns(&non_basis_indices);
-            let cb = c.transpose().select_columns(&basis_indices);
-            let cn = c.transpose().select_columns(&non_basis_indices);
-            let reduced_costs = get_reduced_costs(&cb, &cn, &basis_inv, &non_basis_matrix);
-            let entering_var_loc_or_none = get_entering_var(&reduced_costs);
-            match entering_var_loc_or_none {
-                Some(entering_var_loc) => {
-                    let entering_var = non_basis_indices[entering_var_loc];
-                    let leaving_var_loc_or_none =
-                        get_leaving_var(non_basis_matrix, basis_inv, b, entering_var_loc);
-                    match leaving_var_loc_or_none {
-                        Some(leaving_var_loc) => {
-                            let leaving_var = basis_indices[leaving_var_loc];
-                        }
-                        None => {
-                            // Unbounded program
-                        }
-                    }
-                }
-                None => {
-                    // Program terminated
-                }
-            }
-        }
-        None => {
-            // Singular matrix
-        }
-    }
+    let Some(basis_inv) = basis_inv_or_none else {
+        // singular
+        return;
+    };
+
+    let entering_var_loc_or_none = get_entering_var(&reduced_costs);
+    let Some(entering_var_loc) = entering_var_loc_or_none else {
+        // Terminated
+        return;
+    };
+    let entering_var = non_basis_indices[entering_var_loc];
+    
+    let leaving_var_loc_or_none = get_leaving_var(non_basis_matrix, basis_inv, b, entering_var_loc);
+    let Some(leaving_var_loc) = leaving_var_loc_or_none else {
+        // Unbounded
+        return;
+    };
+    let leaving_var = basis_indices[leaving_var_loc];
+
+    println!("{:?}", entering_var);
+    println!("{:?}", leaving_var);
+
 }
