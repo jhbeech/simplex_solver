@@ -21,39 +21,32 @@ fn get_reduced_costs(
 
 fn get_entering_var(
     reduced_costs: &Matrix<f64, Const<1>, Dynamic, VecStorage<f64, Const<1>, Dynamic>>,
-) -> (usize, f64) {
-    let (index, &value) = reduced_costs
+) -> Option<usize> {
+    reduced_costs
         .iter()
         .enumerate()
+        .filter(|(_, reduced_cost)| **reduced_cost < 0.0)
         .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
-        .expect("Matrix should not be empty");
-
-    (index, value)
+        .map(|(idx, _)| idx)
 }
 
 fn get_leaving_var(
     non_basis_matrix: Matrix<f64, Dynamic, Dynamic, VecStorage<f64, Dynamic, Dynamic>>,
     basis_inv: Matrix<f64, Dynamic, Dynamic, VecStorage<f64, Dynamic, Dynamic>>,
-    basis_indices: Vec<usize>,
     b: Matrix<f64, Dynamic, Const<1>, VecStorage<f64, Dynamic, Const<1>>>,
     entering_loc: usize,
-) -> (usize, usize) {
+) -> Option<usize> {
     let a_entering = &non_basis_matrix.column(entering_loc);
     let tableau = &basis_inv * a_entering;
-    println!("{:?}", tableau);
     let basis_inv_b = basis_inv * b;
     let ratio = basis_inv_b.component_div(&tableau);
-    println!("{:?}", ratio);
     let leaving_var_loc = ratio
         .iter()
         .enumerate()
         .filter(|(idx, _)| tableau[*idx] > 0.00001) // Dereference idx to get the value
         .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap()) // Unwrap safely if no NaN values
-        .map(|(idx, _)| idx) // Extract the index of the minimum
-        .expect("No valid indices found");
-    let leaving_var = basis_indices[leaving_var_loc];
-
-    (leaving_var_loc, leaving_var)
+        .map(|(idx, _)| idx); // Extract the index of the minimum
+    leaving_var_loc
 }
 
 fn primal_simplex(a: DMatrix<f64>, b: DVector<f64>, c: DVector<f64>) {
@@ -73,19 +66,34 @@ fn primal_simplex(a: DMatrix<f64>, b: DVector<f64>, c: DVector<f64>) {
             let cn = c.transpose().select_columns(&non_basis_indices);
 
             let reduced_costs = get_reduced_costs(&cb, &cn, &basis_inv, &non_basis_matrix);
-            let (entering_loc, entering_var) = get_entering_var(&reduced_costs);
+            let entering_var_loc_or_none = get_entering_var(&reduced_costs);
+            match entering_var_loc_or_none {
+                Some(entering_var_loc) => {
+                    let entering_var = non_basis_indices[entering_var_loc];
+                    println!("{:?}", reduced_costs);
+                    println!("{:?}", entering_var_loc);
+                    println!("{:?}", entering_var);
 
-            println!("{:?}", reduced_costs);
-            println!("{:?}", entering_loc);
-            println!("{:?}", entering_var);
-
-            let (leaving_var_loc, leaving_var) =
-                get_leaving_var(non_basis_matrix, basis_inv, basis_indices, b, entering_loc);
-            println!("{:?}", leaving_var_loc);
-            println!("{:?}", leaving_var);
+                    let leaving_var_loc_or_none =
+                        get_leaving_var(non_basis_matrix, basis_inv, b, entering_var_loc);
+                    match leaving_var_loc_or_none {
+                        Some(leaving_var_loc) => {
+                            let leaving_var = basis_indices[leaving_var_loc];
+                            println!("{:?}", leaving_var_loc);
+                            println!("{:?}", leaving_var);
+                        }
+                        None => {
+                            // Unbounded program
+                        }
+                    }
+                }
+                None => {
+                    // Program terminated
+                }
+            }
         }
         None => {
-            print!("not invertible")
+            // Singular matrix
         }
     }
 }
