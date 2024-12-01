@@ -52,35 +52,25 @@ fn get_leaving_var(
 fn primal_simplex(a: DMatrix<f64>, b: DVector<f64>, c: DVector<f64>) {
     let rows = a.nrows(); // Number of constraints
     let cols = a.ncols(); // Number of variables
-
     let basis_indices: Vec<usize> = (cols - rows..cols).collect();
     let non_basis_indices: Vec<usize> = (0..cols).filter(|i| !basis_indices.contains(&i)).collect();
-
     let basis_matrix = a.select_columns(&basis_indices);
-
     let basis_inv_or_none = basis_matrix.try_inverse();
     match basis_inv_or_none {
         Some(basis_inv) => {
             let non_basis_matrix = a.select_columns(&non_basis_indices);
             let cb = c.transpose().select_columns(&basis_indices);
             let cn = c.transpose().select_columns(&non_basis_indices);
-
             let reduced_costs = get_reduced_costs(&cb, &cn, &basis_inv, &non_basis_matrix);
             let entering_var_loc_or_none = get_entering_var(&reduced_costs);
             match entering_var_loc_or_none {
                 Some(entering_var_loc) => {
                     let entering_var = non_basis_indices[entering_var_loc];
-                    println!("{:?}", reduced_costs);
-                    println!("{:?}", entering_var_loc);
-                    println!("{:?}", entering_var);
-
                     let leaving_var_loc_or_none =
                         get_leaving_var(non_basis_matrix, basis_inv, b, entering_var_loc);
                     match leaving_var_loc_or_none {
                         Some(leaving_var_loc) => {
                             let leaving_var = basis_indices[leaving_var_loc];
-                            println!("{:?}", leaving_var_loc);
-                            println!("{:?}", leaving_var);
                         }
                         None => {
                             // Unbounded program
