@@ -12,7 +12,7 @@ fn main() {
     );
     let b = DVector::<f64>::from_vec(vec![10., 12., 25.]);
     let c = DVector::<f64>::from_vec(vec![1.0, 1.0, 1.0, 1.0, 0., 0., 0.]).transpose();
-    primal_simplex(a, b, c);
+    primal_simplex(a, b, c, 100);
 }
 
 use nalgebra::{Const, Dynamic, Matrix, VecStorage};
@@ -42,22 +42,21 @@ fn get_leaving_var(
     entering_loc: usize,
 ) -> Option<usize> {
     let tableau_row = basis_inv * &non_basis_matrix.column(entering_loc);
-    let basis_inv_b = basis_inv * b;
-    basis_inv_b
+    (basis_inv * b)
         .component_div(&tableau_row)
         .iter()
         .enumerate()
-        .filter(|(idx, _)| tableau_row[*idx] > 0.00001) // Dereference idx to get the value
-        .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap()) // Unwrap safely if no NaN values
+        .filter(|(idx, _)| tableau_row[*idx] > 0.00001)
+        .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap()) //Unwrap safe as 0 denominator filtered out
         .map(|(idx, _)| idx) // Extract the index of the minimum
 }
 
-fn primal_simplex(a: DMatrix<f64>, b: Column, c: Row) {
+fn primal_simplex(a: DMatrix<f64>, b: Column, c: Row, max_iterations: i32) {
     let rows = a.nrows(); // Number of constraints
     let cols = a.ncols(); // Number of variables
     let mut basis_indices: Vec<usize> = (cols - rows..cols).collect();
 
-    for _ in 0..100 {
+    for _ in 0..max_iterations {
         let non_basis_indices: Vec<usize> =
             (0..cols).filter(|i| !basis_indices.contains(&i)).collect();
         let non_basis_matrix = a.select_columns(&non_basis_indices);
