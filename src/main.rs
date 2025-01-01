@@ -1,9 +1,9 @@
 use simplex_solver::{primal_simplex, read_matrices_from_json};
 
 fn main() {
-    let big_matrices =
+    let mat =
         read_matrices_from_json("./benches/data/bigExample.json").expect("data should be here");
-    let mut basis = primal_simplex(big_matrices.a, big_matrices.b, big_matrices.c, 1);
+    let mut basis = primal_simplex(mat.a, mat.b, mat.c, 100);
     println!("{:?}", basis);
     // TODO move
     let mut expected_result = vec![
@@ -11,6 +11,7 @@ fn main() {
         64, 65, 67, 68, 69, 70, 72, 73, 74, 76, 77, 78, 79, 80, 82, 83, 84, 87, 88, 90, 91, 92, 94,
         95, 96, 97, 99,
     ];
+    println!("{:?}", basis);
     basis.sort();
     expected_result.sort();
     assert_eq!(basis, expected_result, "Test failed",);

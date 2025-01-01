@@ -40,24 +40,46 @@ fn get_leaving_var(
         .map(|(idx, _)| idx) // Extract the index of the minimum
 }
 
+fn get_inv_sherman_morrison(
+    a: &DMatrix<f64>,
+    basis_inv: &DMatrix<f64>,
+    entering_var: usize,
+    leaving_var: usize,
+    leaving_var_loc: usize,
+) -> DMatrix<f64> {
+    let u = Column::from_vec(
+        (0..a.nrows())
+            .map(|i| a[(i, entering_var)] - a[(i, leaving_var)])
+            .collect::<Vec<f64>>(),
+    );
+    let v = Column::from_vec(
+        (0..a.nrows())
+            .map(|i| if i == leaving_var_loc { 1.0 } else { 0.0 })
+            .collect::<Vec<f64>>(),
+    );
+    let numerator = (basis_inv * &u) * (&v.transpose() * basis_inv);
+    let denominator = (v.transpose() * basis_inv * &u)[(0,0)] + 1.0;
+    let update = - numerator / denominator;
+
+    basis_inv + update
+}
+
 pub fn primal_simplex(a: DMatrix<f64>, b: Column, c: Row, max_iterations: i32) -> Vec<usize> {
     let rows = a.nrows(); // Number of constraints
     let cols = a.ncols(); // Number of variables
     let mut basis_indices: Vec<usize> = (cols - rows..cols).collect();
     let mut non_basis_indices: Vec<usize> =
         (0..cols).filter(|i| !basis_indices.contains(&i)).collect();
+    let basis_inv_or_none = a.select_columns(&basis_indices).try_inverse();
+    let Some(mut basis_inv) = basis_inv_or_none else {
+        print!("a is singular");
+        return vec![];
+    };
 
     for it in 0..max_iterations {
         let non_basis_matrix = a.select_columns(&non_basis_indices);
-        let basis_matrix = a.select_columns(&basis_indices);
         let cb = c.select_columns(&basis_indices);
         let cn = c.select_columns(&non_basis_indices);
-        // TODO: add sherman morrison here
-        let basis_inv_or_none = basis_matrix.try_inverse();
-        let Some(basis_inv) = basis_inv_or_none else {
-            print!("a is singular");
-            break;
-        };
         let reduced_costs = get_reduced_costs(&cb, &cn, &basis_inv, &non_basis_matrix);
         let entering_var_loc_or_none = get_entering_var(&reduced_costs);
         let Some(entering_var_loc) = entering_var_loc_or_none else {
@@ -67,18 +89,16 @@ pub fn primal_simplex(a: DMatrix<f64>, b: Column, c: Row, max_iterations: i32) -
         };
         let entering_var = non_basis_indices[entering_var_loc];
 
-        let leaving_var_loc_or_none =
-            get_leaving_var(&a, &basis_inv, &b, entering_var);
+        let leaving_var_loc_or_none = get_leaving_var(&a, &basis_inv, &b, entering_var);
         let Some(leaving_var_loc) = leaving_var_loc_or_none else {
             println!("Program is unbounded");
             break;
         };
         let leaving_var = basis_indices[leaving_var_loc];
 
-        // need to replace leaving var with entering var (ie they are in same loc)
-        // for sherman morrison algorithm to work
         basis_indices[leaving_var_loc] = entering_var;
         non_basis_indices[entering_var_loc] = leaving_var;
+        basis_inv = get_inv_sherman_morrison(&a, &basis_inv, entering_var, leaving_var, leaving_var_loc);
     }
 
     basis_indices
@@ -121,17 +141,18 @@ mod tests {
 
     #[test]
     fn test_big_example() {
-        let big_matrices = read_matrices_from_json("./benches/data/bigExample.json")
-            .expect("data should be here");
-        
+        let big_matrices =
+            read_matrices_from_json("./benches/data/bigExample.json").expect("data should be here");
+
         let mut basis = primal_simplex(big_matrices.a, big_matrices.b, big_matrices.c, 100);
         // TODO move
-        let mut expected_result = vec![3, 6, 7, 15, 16, 17, 20, 25, 26, 30, 35, 37, 38, 39, 40, 42, 48, 50, 51, 55, 56, 61, 62, 64, 65, 67, 68, 69, 70, 72, 73, 74, 76, 77, 78, 79, 80, 82, 83, 84, 87, 88, 90, 91, 92, 94, 95, 96, 97, 99];
+        let mut expected_result = vec![
+            3, 6, 7, 15, 16, 17, 20, 25, 26, 30, 35, 37, 38, 39, 40, 42, 48, 50, 51, 55, 56, 61,
+            62, 64, 65, 67, 68, 69, 70, 72, 73, 74, 76, 77, 78, 79, 80, 82, 83, 84, 87, 88, 90, 91,
+            92, 94, 95, 96, 97, 99,
+        ];
         basis.sort();
         expected_result.sort();
-        assert_eq!(
-            basis, expected_result,
-            "Test failed",
-        );
+        assert_eq!(basis, expected_result, "Test failed",);
     }
 }
