@@ -75,7 +75,7 @@ pub fn primal_simplex(a: DMatrix<f64>, b: Column, c: Row, max_iterations: i32) -
         print!("a is singular");
         return vec![];
     };
-
+    
     for it in 0..max_iterations {
         let non_basis_matrix = a.select_columns(&non_basis_indices);
         let cb = c.select_columns(&basis_indices);
@@ -88,13 +88,15 @@ pub fn primal_simplex(a: DMatrix<f64>, b: Column, c: Row, max_iterations: i32) -
             break;
         };
         let entering_var = non_basis_indices[entering_var_loc];
-
+        
         let leaving_var_loc_or_none = get_leaving_var(&a, &basis_inv, &b, entering_var);
         let Some(leaving_var_loc) = leaving_var_loc_or_none else {
             println!("Program is unbounded");
             break;
         };
         let leaving_var = basis_indices[leaving_var_loc];
+        
+        print!("it: {}, leaving: {},entering {}\n", it, leaving_var, entering_var);
 
         basis_indices[leaving_var_loc] = entering_var;
         non_basis_indices[entering_var_loc] = leaving_var;
@@ -112,6 +114,7 @@ pub struct Matrices {
     pub a: DMatrix<f64>,
     pub b: Column,
     pub c: Row,
+    pub sol: Vec<usize>
 }
 
 pub fn read_matrices_from_json(file_path: &str) -> Result<Matrices> {
@@ -129,13 +132,12 @@ mod tests {
     fn test_small_example() {
         let small_matrices = read_matrices_from_json("./benches/data/smallExample.json")
             .expect("data should be here");
-        let basis = primal_simplex(small_matrices.a, small_matrices.b, small_matrices.c, 10000);
-
-        let expected_result = vec![1, 5, 6];
+        let mut basis = primal_simplex(small_matrices.a, small_matrices.b, small_matrices.c, 10000);
+        basis.sort();
+        let expected_result = small_matrices.sol;
         assert_eq!(
             basis, expected_result,
-            "Test failed: Expected [1, 5, 6], got {:?}",
-            basis
+            "Small test failed",
         );
     }
 
@@ -145,14 +147,8 @@ mod tests {
             read_matrices_from_json("./benches/data/bigExample.json").expect("data should be here");
 
         let mut basis = primal_simplex(big_matrices.a, big_matrices.b, big_matrices.c, 100);
-        // TODO move
-        let mut expected_result = vec![
-            3, 6, 7, 15, 16, 17, 20, 25, 26, 30, 35, 37, 38, 39, 40, 42, 48, 50, 51, 55, 56, 61,
-            62, 64, 65, 67, 68, 69, 70, 72, 73, 74, 76, 77, 78, 79, 80, 82, 83, 84, 87, 88, 90, 91,
-            92, 94, 95, 96, 97, 99,
-        ];
+        let expected_result = big_matrices.sol;
         basis.sort();
-        expected_result.sort();
         assert_eq!(basis, expected_result, "Test failed",);
     }
 }
