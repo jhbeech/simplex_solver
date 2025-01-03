@@ -58,8 +58,8 @@ fn get_inv_sherman_morrison(
             .collect::<Vec<f64>>(),
     );
     let numerator = (basis_inv * &u) * (&v.transpose() * basis_inv);
-    let denominator = (v.transpose() * basis_inv * &u)[(0,0)] + 1.0;
-    let update = - numerator / denominator;
+    let denominator = (v.transpose() * basis_inv * &u)[(0, 0)] + 1.0;
+    let update = -numerator / denominator;
 
     basis_inv + update
 }
@@ -75,7 +75,7 @@ pub fn primal_simplex(a: DMatrix<f64>, b: Column, c: Row, max_iterations: i32) -
         print!("a is singular");
         return vec![];
     };
-    
+
     for it in 0..max_iterations {
         let non_basis_matrix = a.select_columns(&non_basis_indices);
         let cb = c.select_columns(&basis_indices);
@@ -88,19 +88,23 @@ pub fn primal_simplex(a: DMatrix<f64>, b: Column, c: Row, max_iterations: i32) -
             break;
         };
         let entering_var = non_basis_indices[entering_var_loc];
-        
+
         let leaving_var_loc_or_none = get_leaving_var(&a, &basis_inv, &b, entering_var);
         let Some(leaving_var_loc) = leaving_var_loc_or_none else {
             println!("Program is unbounded");
             break;
         };
         let leaving_var = basis_indices[leaving_var_loc];
-        
-        print!("it: {}, leaving: {},entering {}\n", it, leaving_var, entering_var);
+
+        print!(
+            "it: {}, leaving: {},entering {}\n",
+            it, leaving_var, entering_var
+        );
 
         basis_indices[leaving_var_loc] = entering_var;
         non_basis_indices[entering_var_loc] = leaving_var;
-        basis_inv = get_inv_sherman_morrison(&a, &basis_inv, entering_var, leaving_var, leaving_var_loc);
+        basis_inv =
+            get_inv_sherman_morrison(&a, &basis_inv, entering_var, leaving_var, leaving_var_loc);
     }
 
     basis_indices
@@ -114,7 +118,7 @@ pub struct Matrices {
     pub a: DMatrix<f64>,
     pub b: Column,
     pub c: Row,
-    pub sol: Vec<usize>
+    pub sol: Vec<usize>,
 }
 
 pub fn read_matrices_from_json(file_path: &str) -> Result<Matrices> {
@@ -135,10 +139,7 @@ mod tests {
         let mut basis = primal_simplex(small_matrices.a, small_matrices.b, small_matrices.c, 10000);
         basis.sort();
         let expected_result = small_matrices.sol;
-        assert_eq!(
-            basis, expected_result,
-            "Small test failed",
-        );
+        assert_eq!(basis, expected_result, "Small test failed",);
     }
 
     #[test]
